@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inflenauta - Calculadora de Inflación Argentina</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e88e5 0%, #1565c0 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+            text-align: center;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .date-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .date-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        input[type="number"],
+        input[type="date"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="number"]:focus,
+        input[type="date"]:focus {
+            outline: none;
+            border-color: #1e88e5;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #1e88e5 0%, #1565c0 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .results {
+            margin-top: 30px;
+            padding: 25px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            display: none;
+        }
+
+        .results.show {
+            display: block;
+            animation: fadeIn 0.5s;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .result-item {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .result-item:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .result-label {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .result-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #333;
+        }
+
+        .result-value.primary {
+            color: #1e88e5;
+        }
+
+        .result-value.success {
+            color: #28a745;
+        }
+
+        .loading {
+            text-align: center;
+            color: #1e88e5;
+            font-weight: 600;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .error.show {
+            display: block;
+        }
+
+        .info-text {
+            font-size: 12px;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        .chart-container {
+            margin-top: 30px;
+            padding: 25px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            display: none;
+        }
+
+        .chart-container.show {
+            display: block;
+            animation: fadeIn 0.5s;
+        }
+
+        .chart-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        #inflationChart {
+            max-height: 400px;
+        }
+
+        @media (max-width: 768px) {
+            .date-row {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Inflenauta</h1>
+        <p class="subtitle">Navegá la inflación argentina</p>
+
+        <form id="calculatorForm">
+            <div class="form-group">
+                <label for="amount">Monto pagado (ARS)</label>
+                <input type="number" id="amount" required min="0" step="0.01" placeholder="Ej: 10000">
+            </div>
+
+            <div class="date-row">
+                <div class="date-group">
+                    <label for="dateFrom">Fecha de compra</label>
+                    <input type="date" id="dateFrom" required>
+                </div>
+
+                <div class="date-group">
+                    <label for="dateTo">Comparar con fecha</label>
+                    <input type="date" id="dateTo" required>
+                </div>
+            </div>
+
+            <button type="submit" id="calculateBtn">Calcular</button>
+        </form>
+
+        <div class="loading" id="loading">Calculando...</div>
+        <div class="error" id="error"></div>
+
+        <div class="results" id="results">
+            <div class="result-item">
+                <div class="result-label" id="originalAmountLabel">Monto original</div>
+                <div class="result-value" id="originalAmount"></div>
+            </div>
+
+            <div class="result-item">
+                <div class="result-label" id="usdOriginalLabel">En dólar blue</div>
+                <div class="result-value success" id="usdOriginal"></div>
+            </div>
+
+            <div class="result-item" id="adjustedAmountItem">
+                <div class="result-label" id="adjustedAmountLabel">Valor ajustado por inflación</div>
+                <div class="result-value primary" id="adjustedAmount"></div>
+            </div>
+
+            <div class="result-item" id="usdAdjustedItem">
+                <div class="result-label" id="usdAdjustedLabel">En dólar blue</div>
+                <div class="result-value success" id="usdAdjusted"></div>
+            </div>
+
+            <div class="result-item" id="inflationRateItem">
+                <div class="result-label">Inflación acumulada</div>
+                <div class="result-value" id="inflationRate"></div>
+            </div>
+        </div>
+
+        <div class="chart-container" id="chartContainer">
+            <div class="chart-title">Evolución del valor en el tiempo</div>
+            <canvas id="inflationChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        let inflationChart = null;
+
+        // Set today's date as default for both date fields
+        const today = new Date();
+        document.getElementById('dateFrom').valueAsDate = today;
+        document.getElementById('dateTo').valueAsDate = today;
+
+        document.getElementById('calculatorForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const amount = parseFloat(document.getElementById('amount').value);
+            const dateFrom = document.getElementById('dateFrom').value;
+            const dateTo = document.getElementById('dateTo').value;
+
+            // Show loading, hide results and errors
+            document.getElementById('loading').classList.add('show');
+            document.getElementById('results').classList.remove('show');
+            document.getElementById('error').classList.remove('show');
+            document.getElementById('calculateBtn').disabled = true;
+
+            try {
+                // Fetch data from both APIs
+                const [inflationResponse, dolarResponse] = await Promise.all([
+                    fetch('https://api.argentinadatos.com/v1/finanzas/indices/inflacion'),
+                    fetch('https://api.argentinadatos.com/v1/cotizaciones/dolares/blue')
+                ]);
+
+                if (!inflationResponse.ok || !dolarResponse.ok) {
+                    throw new Error('Error al obtener datos de las APIs');
+                }
+
+                const inflationData = await inflationResponse.json();
+                const dolarData = await dolarResponse.json();
+
+                // Calculate inflation adjustment
+                const result = calculateInflation(amount, dateFrom, dateTo, inflationData, dolarData);
+
+                if (result.error) {
+                    throw new Error(result.error);
+                }
+
+                // Display results
+                displayResults(result, dateFrom, dateTo);
+
+                // Generate and display chart only if dates are different
+                if (!result.isSameDate) {
+                    displayChart(amount, dateFrom, dateTo, inflationData, dolarData);
+                } else {
+                    // Hide chart if dates are the same
+                    document.getElementById('chartContainer').classList.remove('show');
+                }
+
+            } catch (error) {
+                document.getElementById('error').textContent = error.message;
+                document.getElementById('error').classList.add('show');
+            } finally {
+                document.getElementById('loading').classList.remove('show');
+                document.getElementById('calculateBtn').disabled = false;
+            }
+        });
+
+        function calculateInflation(amount, dateFrom, dateTo, inflationData, dolarData) {
+            const fromDate = new Date(dateFrom);
+            const toDate = new Date(dateTo);
+
+            // Check if dates are the same
+            const isSameDate = fromDate.getTime() === toDate.getTime();
+
+            // Allow comparisons in both directions
+            const isBackwardComparison = fromDate > toDate;
+
+            let accumulatedInflation = 0;
+            let inflationFactor = 1;
+            let adjustedAmount = amount;
+
+            if (!isSameDate) {
+                // Calculate accumulated inflation (works in both directions)
+                accumulatedInflation = getAccumulatedInflation(fromDate, toDate, inflationData);
+
+                if (accumulatedInflation === null) {
+                    return { error: 'No hay datos de inflación disponibles para las fechas seleccionadas' };
+                }
+
+                // Calculate adjusted amount
+                inflationFactor = 1 + (accumulatedInflation / 100);
+                adjustedAmount = amount * inflationFactor;
+            }
+
+            const inflationRate = accumulatedInflation;
+
+            // Get dolar blue values
+            const dolarFrom = getDolarForDate(fromDate, dolarData);
+            const dolarTo = getDolarForDate(toDate, dolarData);
+
+            if (!dolarFrom || !dolarTo) {
+                return { error: 'No hay datos de dólar blue disponibles para las fechas seleccionadas' };
+            }
+
+            const usdOriginal = amount / dolarFrom;
+            const usdAdjusted = adjustedAmount / dolarTo;
+
+            return {
+                originalAmount: amount,
+                adjustedAmount,
+                inflationRate,
+                usdOriginal,
+                usdAdjusted,
+                dolarFrom,
+                dolarTo,
+                isBackwardComparison,
+                isSameDate
+            };
+        }
+
+        function buildInflationIndex(inflationData) {
+            // Sort data by date ascending
+            const sortedData = inflationData.sort((a, b) => {
+                const dateA = new Date(a.fecha);
+                const dateB = new Date(b.fecha);
+                return dateA - dateB;
+            });
+
+            // Build cumulative index starting at 100
+            const index = [];
+            let cumulativeIndex = 100;
+
+            for (let data of sortedData) {
+                // Apply monthly inflation to cumulative index
+                cumulativeIndex *= (1 + data.valor / 100);
+
+                index.push({
+                    fecha: new Date(data.fecha),
+                    indice: cumulativeIndex,
+                    inflacionMensual: data.valor
+                });
+            }
+
+            return index;
+        }
+
+        function getIndexForDate(date, inflationIndex) {
+            // Find the closest available index point for the given date
+            let closestIndex = null;
+
+            for (let data of inflationIndex) {
+                if (data.fecha <= date) {
+                    closestIndex = data;
+                } else {
+                    break;
+                }
+            }
+
+            return closestIndex ? closestIndex.indice : null;
+        }
+
+        function getAccumulatedInflation(fromDate, toDate, inflationData) {
+            // Build inflation index
+            const inflationIndex = buildInflationIndex(inflationData);
+
+            // Get index values for both dates
+            const indexFrom = getIndexForDate(fromDate, inflationIndex);
+            const indexTo = getIndexForDate(toDate, inflationIndex);
+
+            if (!indexFrom || !indexTo) {
+                return null;
+            }
+
+            // Calculate accumulated inflation between the two dates
+            // This works for both forward and backward comparisons
+            const accumulatedInflation = ((indexTo / indexFrom) - 1) * 100;
+
+            return accumulatedInflation;
+        }
+
+        function getIPCForDate(date, inflationData) {
+            const year = date.getFullYear();
+            const month = date.getMonth() + 1; // JavaScript months are 0-indexed
+
+            // Find the closest available data point
+            const sortedData = inflationData.sort((a, b) => {
+                const dateA = new Date(a.fecha);
+                const dateB = new Date(b.fecha);
+                return dateB - dateA;
+            });
+
+            for (let data of sortedData) {
+                const dataDate = new Date(data.fecha);
+                const dataYear = dataDate.getFullYear();
+                const dataMonth = dataDate.getMonth() + 1;
+
+                if (dataYear < year || (dataYear === year && dataMonth <= month)) {
+                    return data.valor;
+                }
+            }
+
+            return null;
+        }
+
+        function getDolarForDate(date, dolarData) {
+            // Find the closest date
+            const sortedData = dolarData.sort((a, b) => {
+                const dateA = new Date(a.fecha);
+                const dateB = new Date(b.fecha);
+                return dateB - dateA;
+            });
+
+            for (let data of sortedData) {
+                const dataDate = new Date(data.fecha);
+                if (dataDate <= date) {
+                    return data.venta; // Use "venta" (sell) price
+                }
+            }
+
+            return null;
+        }
+
+        function displayResults(result, dateFrom, dateTo) {
+            const fromDate = new Date(dateFrom);
+            const toDate = new Date(dateTo);
+
+            // Format dates for display
+            const fromDateStr = fromDate.toLocaleDateString('es-AR');
+            const toDateStr = toDate.toLocaleDateString('es-AR');
+
+            // Update labels with dates
+            document.getElementById('originalAmountLabel').textContent =
+                `Monto original (${fromDateStr})`;
+            document.getElementById('usdOriginalLabel').textContent =
+                `En dólar blue (${fromDateStr})`;
+
+            // Set original values
+            document.getElementById('originalAmount').textContent =
+                formatCurrency(result.originalAmount);
+            document.getElementById('usdOriginal').textContent =
+                formatUSD(result.usdOriginal);
+
+            // Show/hide comparison fields based on whether dates are the same
+            const adjustedAmountItem = document.getElementById('adjustedAmountItem');
+            const usdAdjustedItem = document.getElementById('usdAdjustedItem');
+            const inflationRateItem = document.getElementById('inflationRateItem');
+
+            if (result.isSameDate) {
+                // Hide comparison fields when dates are the same
+                adjustedAmountItem.style.display = 'none';
+                usdAdjustedItem.style.display = 'none';
+                inflationRateItem.style.display = 'none';
+            } else {
+                // Show comparison fields when dates are different
+                adjustedAmountItem.style.display = 'block';
+                usdAdjustedItem.style.display = 'block';
+                inflationRateItem.style.display = 'block';
+
+                // Update labels for comparison fields
+                document.getElementById('adjustedAmountLabel').textContent =
+                    `Valor ajustado por inflación (${toDateStr})`;
+                document.getElementById('usdAdjustedLabel').textContent =
+                    `En dólar blue (${toDateStr})`;
+
+                // Calculate and display values
+                document.getElementById('adjustedAmount').textContent =
+                    formatCurrency(result.adjustedAmount);
+
+                document.getElementById('usdAdjusted').textContent =
+                    formatUSD(result.usdAdjusted);
+
+                document.getElementById('inflationRate').textContent =
+                    formatPercentage(result.inflationRate);
+            }
+
+            document.getElementById('results').classList.add('show');
+        }
+
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('es-AR', {
+                style: 'currency',
+                currency: 'ARS',
+                minimumFractionDigits: 2
+            }).format(value);
+        }
+
+        function formatUSD(value) {
+            return new Intl.NumberFormat('es-AR', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 2
+            }).format(value);
+        }
+
+        function formatPercentage(value) {
+            return `${value.toFixed(2)}%`;
+        }
+
+        function generateChartData(amount, dateFrom, dateTo, inflationData, dolarData) {
+            const fromDate = new Date(dateFrom);
+            const toDate = new Date(dateTo);
+
+            // Build inflation index
+            const inflationIndex = buildInflationIndex(inflationData);
+
+            // Get the base index for the starting date
+            const baseIndex = getIndexForDate(fromDate, inflationIndex);
+            if (!baseIndex) return null;
+
+            // Generate monthly data points
+            const labels = [];
+            const adjustedValues = [];
+            const usdValues = [];
+
+            // Filter inflation index to only include dates between fromDate and toDate
+            const startDate = fromDate < toDate ? fromDate : toDate;
+            const endDate = fromDate < toDate ? toDate : fromDate;
+
+            for (let data of inflationIndex) {
+                if (data.fecha >= startDate && data.fecha <= endDate) {
+                    // Calculate adjusted value at this point in time
+                    const inflationFactor = data.indice / baseIndex;
+                    const adjustedValue = amount * inflationFactor;
+
+                    // Get dolar value for this date
+                    const dolarValue = getDolarForDate(data.fecha, dolarData);
+                    const usdValue = dolarValue ? adjustedValue / dolarValue : null;
+
+                    labels.push(data.fecha);
+                    adjustedValues.push(adjustedValue);
+                    usdValues.push(usdValue);
+                }
+            }
+
+            return {
+                labels,
+                adjustedValues,
+                usdValues
+            };
+        }
+
+        function displayChart(amount, dateFrom, dateTo, inflationData, dolarData) {
+            const chartData = generateChartData(amount, dateFrom, dateTo, inflationData, dolarData);
+
+            if (!chartData) {
+                return;
+            }
+
+            // Destroy previous chart if exists
+            if (inflationChart) {
+                inflationChart.destroy();
+            }
+
+            const ctx = document.getElementById('inflationChart').getContext('2d');
+
+            inflationChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartData.labels,
+                    datasets: [
+                        {
+                            label: 'Valor ajustado (ARS)',
+                            data: chartData.adjustedValues,
+                            borderColor: '#1e88e5',
+                            backgroundColor: 'rgba(30, 136, 229, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Valor en USD Blue',
+                            data: chartData.usdValues,
+                            borderColor: '#28a745',
+                            backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                title: function(context) {
+                                    const date = context[0].parsed.x;
+                                    const dateObj = chartData.labels[date];
+                                    return dateObj.toLocaleDateString('es-AR', {
+                                        year: 'numeric',
+                                        month: 'long'
+                                    });
+                                },
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        if (context.datasetIndex === 0) {
+                                            label += formatCurrency(context.parsed.y);
+                                        } else {
+                                            label += formatUSD(context.parsed.y);
+                                        }
+                                    }
+                                    return label;
+                                }
+                            }
+                        },
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'category',
+                            ticks: {
+                                callback: function(value, index) {
+                                    const date = chartData.labels[index];
+                                    return date.toLocaleDateString('es-AR', {
+                                        year: '2-digit',
+                                        month: 'short'
+                                    });
+                                },
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Valor en ARS'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + value.toLocaleString('es-AR');
+                                }
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Valor en USD'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return 'USD ' + value.toFixed(2);
+                                }
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Show chart container
+            document.getElementById('chartContainer').classList.add('show');
+        }
+    </script>
+</body>
+</html>
